@@ -1,0 +1,288 @@
+import React from 'react';
+import { Calendar, Pause, Pencil, Play, Trash2, TrendingUp } from 'lucide-react';
+import { SIP } from '../types';
+import { calculateSipInvested, formatCurrency, formatDate, toStandardDate } from '../utils/calculations';
+
+interface SipsTableProps {
+  sips: SIP[];
+  onAdd: () => void;
+  onEdit: (sip: SIP) => void;
+  onDeleteRequest: (sip: SIP) => void;
+  onTogglePause?: (sip: SIP) => void;
+}
+
+export const SipsTable: React.FC<SipsTableProps> = ({
+  sips,
+  onAdd,
+  onEdit,
+  onDeleteRequest,
+  onTogglePause,
+}) => {
+  const todayFormatted = formatDate(new Date(), 'DD-MM-YYYY');
+
+  const filtered = sips;
+
+  const activeCount = sips.filter((s) => !s.isPaused).length;
+  const pausedCount = sips.filter((s) => s.isPaused).length;
+
+  const totalCalculatedAccumulation = filtered.reduce(
+    (sum, s) => sum + calculateSipInvested(s),
+    0
+  );
+
+  // Group filtered SIPs by Platform
+  const platformGroupMap = new Map<string, SIP[]>();
+  filtered.forEach((item) => {
+    const p = item.platform || 'Other';
+    if (!platformGroupMap.has(p)) {
+      platformGroupMap.set(p, []);
+    }
+    platformGroupMap.get(p)!.push(item);
+  });
+
+  const groupedPlatforms: { platform: string; items: SIP[]; totalInvested: number }[] = [];
+  platformGroupMap.forEach((items, platform) => {
+    const totalInvested = items.reduce((sum, s) => sum + calculateSipInvested(s), 0);
+    groupedPlatforms.push({ platform, items, totalInvested });
+  });
+
+  // Sort groups by totalInvested descending
+  groupedPlatforms.sort((a, b) => b.totalInvested - a.totalInvested);
+
+  return (
+    <div className="space-y-3">
+      {/* Consolidated SIP Header Toolbar - Single Row */}
+      <div className="p-3 sm:p-3.5 rounded-2xl glass-panel flex items-center justify-between gap-2.5">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 backdrop-blur-md shrink-0">
+            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                Active SIPs ({activeCount})
+              </span>
+              {pausedCount > 0 && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                  {pausedCount} paused
+                </span>
+              )}
+              <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border border-slate-300/40 dark:border-slate-700/40 flex items-center gap-1 shrink-0">
+                <Calendar className="w-3 h-3 text-slate-500" />
+                <span>{todayFormatted}</span>
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Total Invested Till Date: <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold text-xs sm:text-sm">{formatCurrency(totalCalculatedAccumulation)}</strong>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Grouped Platform Boxes for SIPs */}
+      {groupedPlatforms.length === 0 ? (
+        <div className="p-8 text-center glass-panel rounded-2xl text-slate-500">
+          No SIP entries found matching search.
+        </div>
+      ) : (
+        groupedPlatforms.map((group) => (
+          <div
+            key={group.platform}
+            className="glass-panel rounded-2xl overflow-hidden"
+          >
+            {/* Single Platform Header */}
+            <div className="px-4 sm:px-5 py-3.5 bg-white/40 dark:bg-slate-800/40 backdrop-blur-md border-b border-white/40 dark:border-white/10 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-amber-600 dark:text-amber-400 tracking-tight">
+                {group.platform}
+              </h3>
+              <span className="text-xs font-mono text-slate-600 dark:text-slate-300 font-medium">
+                {group.items.length} {group.items.length === 1 ? 'entry' : 'entries'} &bull; Invested: <strong className="text-slate-900 dark:text-white font-extrabold text-sm">{formatCurrency(group.totalInvested)}</strong>
+              </span>
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse table-fixed">
+                <thead>
+                  <tr className="border-b border-white/30 dark:border-white/10 text-[11px] font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wider bg-white/30 dark:bg-slate-800/30 backdrop-blur-md">
+                    <th className="py-2.5 px-4 w-[18%]">Instrument</th>
+                    <th className="py-2.5 px-4 text-right w-[15%]">Recurring Amount</th>
+                    <th className="py-2.5 px-4 w-[12%]">Frequency</th>
+                    <th className="py-2.5 px-4 w-[15%]">Since</th>
+                    <th className="py-2.5 px-4 text-right w-[18%]">Invested Till Date</th>
+                    <th className="py-2.5 px-4 w-[14%]">Remarks</th>
+                    <th className="py-2.5 px-4 text-center w-[8%]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/20 dark:divide-white/5 text-sm">
+                  {group.items.map((item) => {
+                    const invested = calculateSipInvested(item);
+                    return (
+                      <tr key={item.id} className="hover:bg-white/40 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-4 font-semibold text-slate-800 dark:text-slate-100 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span>{item.instrument}</span>
+                            {item.isPaused ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                <Pause className="w-2.5 h-2.5" /> PAUSED
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                                <Play className="w-2.5 h-2.5" /> ACTIVE
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-bold text-slate-800 dark:text-slate-200">
+                          ₹{item.amount.toLocaleString('en-IN')}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="inline-block px-2.5 py-0.5 text-xs font-semibold rounded-lg bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
+                            {item.frequency}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-xs font-mono text-slate-600 dark:text-slate-400">
+                          {item.since ? toStandardDate(item.since) : '—'}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600 dark:text-emerald-400 text-base font-mono">
+                          {formatCurrency(invested)}
+                        </td>
+                        <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-slate-400 max-w-xs truncate">
+                          {item.remarks || '—'}
+                        </td>
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {onTogglePause && (
+                              <button
+                                onClick={() => onTogglePause(item)}
+                                title={item.isPaused ? "Resume SIP" : "Pause SIP"}
+                                className={`p-1.5 rounded-xl border transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold ${
+                                  item.isPaused
+                                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                                    : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+                                }`}
+                              >
+                                {item.isPaused ? (
+                                  <>
+                                    <Play className="w-3.5 h-3.5" />
+                                    <span>Resume</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Pause className="w-3.5 h-3.5" />
+                                    <span>Pause</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => onEdit(item)}
+                              title="Edit"
+                              className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 rounded-xl transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => onDeleteRequest(item)}
+                              title="Delete"
+                              className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-500/20 rounded-xl transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Stack View */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60 p-3 space-y-3">
+              {group.items.map((item) => {
+                const invested = calculateSipInvested(item);
+                return (
+                  <div key={item.id} className="pt-3 first:pt-0 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                            {item.instrument}
+                          </h4>
+                          {item.isPaused ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                              <Pause className="w-2.5 h-2.5" /> PAUSED
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                              <Play className="w-2.5 h-2.5" /> ACTIVE
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-500">
+                          ₹{item.amount.toLocaleString('en-IN')} /{item.frequency}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs text-slate-400 uppercase block text-[10px]">Invested</span>
+                        <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(invested)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                      Since: {item.since ? toStandardDate(item.since) : '—'}
+                    </p>
+
+                    {item.remarks && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                        "{item.remarks}"
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      {onTogglePause && (
+                        <button
+                          onClick={() => onTogglePause(item)}
+                          className={`px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
+                            item.isPaused
+                              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                              : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+                          }`}
+                        >
+                          {item.isPaused ? (
+                            <>
+                              <Play className="w-3 h-3" /> Resume
+                            </>
+                          ) : (
+                            <>
+                              <Pause className="w-3 h-3" /> Pause
+                            </>
+                          )}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onEdit(item)}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Edit
+                      </button>
+                      <button
+                        onClick={() => onDeleteRequest(item)}
+                        className="px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Del
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+};

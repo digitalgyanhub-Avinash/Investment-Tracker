@@ -1,0 +1,6 @@
+{
+  "appId": "com.investment.committee.ledger",
+  "appName": "Investment & Committee Ledger",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

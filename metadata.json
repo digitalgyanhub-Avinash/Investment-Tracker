@@ -1,0 +1,8 @@
+{
+  "name": "Remix Investment-Tracker-App",
+  "description": "Imported from GitHub: AvinashDBA/Investment-Tracker",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

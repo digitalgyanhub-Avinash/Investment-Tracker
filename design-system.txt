@@ -1,0 +1,71 @@
+================================================================================
+PORTFOLIO APPLICATION - DESIGN SYSTEM, COLOR PALETTE & TYPOGRAPHY SPECIFICATION
+================================================================================
+
+1. DESIGN ARCHETYPE & THEME
+--------------------------------------------------------------------------------
+- Design Philosophy: Modern Glassmorphism & Liquid Bento Grid
+- Aesthetic Structure: Translucent frosted glass containers (backdrop-blur-xl),
+  subtle multi-layered borders, and soft directional light glows.
+- Canvas Backgrounds:
+  * Light Mode: Mesh gradient on a clean, soft canvas
+    (bg-gradient-to-br from-slate-50 via-teal-50/20 to-blue-50/20)
+  * Dark Mode: Deep slate-to-zinc canvas
+    (bg-gradient-to-br from-slate-950 via-slate-900 to-zinc-950)
+
+
+2. TYPOGRAPHY SYSTEM
+--------------------------------------------------------------------------------
+- Display & UI Body Font: Inter / Plus Jakarta Sans
+  (Clean modern geometric sans-serif with high legibility, balanced tracking, 
+  and step-ratio hierarchy).
+- Numerical & Financial Data: Monospace (font-mono)
+  (Used across all monetary figures, currency amounts, percentages, quantities,
+  dates, and breakdown chips for precise tabular alignment).
+- Weight Hierarchy:
+  * Bold / ExtraBold (font-bold, font-extrabold): Large total portfolio figures,
+    primary KPI values, section headers.
+  * Semibold / Medium (font-semibold, font-medium): Table headers, button labels,
+    badge pills, ticker symbols.
+  * Regular / Italic (font-normal, italic): Supporting notes, remarks, timestamps.
+
+
+3. SIGNATURE TAB COLOR SCHEMES
+--------------------------------------------------------------------------------
+- Summary / Dashboard:
+  * Gradient: from-emerald-500 to-teal-600
+  * Accent/Glow: emerald-500/30 glow, emerald-50 light hover, emerald-950/30 dark hover
+
+- Holdings:
+  * Gradient: from-blue-500 to-cyan-600
+  * Accent/Glow: blue-500/30 glow, blue-50 light hover, blue-950/30 dark hover
+
+- SIPs:
+  * Gradient: from-amber-500 to-orange-600
+  * Accent/Glow: amber-500/30 glow, amber-50 light hover, amber-950/30 dark hover
+
+- IPOs:
+  * Gradient: from-purple-600 to-fuchsia-600
+  * Accent/Glow: purple-500/30 glow, purple-50 light hover, purple-950/30 dark hover
+
+- Committees (Chits):
+  * Gradient: from-indigo-600 to-violet-600
+  * Accent/Glow: indigo-500/30 glow, indigo-50 light hover, indigo-950/30 dark hover
+
+
+4. FUNCTIONAL STATUS & UTILITY COLORS
+--------------------------------------------------------------------------------
+- Positive Returns / Gains / Active / Allotted:
+  * Emerald (#10B981 / emerald-600 / emerald-400)
+- Negative Returns / Losses / Deductions:
+  * Crimson Rose (#EF4444 / red-600 / red-400)
+- Pending / In-Review / Upcoming:
+  * Amber Gold (#F59E0B / amber-500)
+- Closed / Inactive / Neutral:
+  * Slate Gray (#64748B / slate-500)
+- Borders & Dividers:
+  * High-contrast subtle borders (border-white/40 dark:border-white/10)
+- Interactive Modals & Floating Docks:
+  * Frosted Glass (bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border border-white/20 shadow-2xl)
+
+================================================================================
