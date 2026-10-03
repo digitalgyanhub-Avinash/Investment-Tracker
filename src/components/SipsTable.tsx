@@ -51,30 +51,46 @@ export const SipsTable: React.FC<SipsTableProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* Consolidated SIP Header Toolbar - Single Row */}
-      <div className="p-3 sm:p-3.5 rounded-2xl glass-panel flex items-center justify-between gap-2.5">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 backdrop-blur-md shrink-0">
-            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
-          </div>
-          <div>
+      {/* Consolidated SIP Header Card - Reformed Design */}
+      <div className="p-4 sm:p-5 rounded-2xl glass-panel space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 backdrop-blur-md shrink-0">
+              <TrendingUp className="w-5 h-5" />
+            </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
                 Active SIPs ({activeCount})
-              </span>
+              </h3>
               {pausedCount > 0 && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
                   {pausedCount} paused
                 </span>
               )}
-              <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border border-slate-300/40 dark:border-slate-700/40 flex items-center gap-1 shrink-0">
-                <Calendar className="w-3 h-3 text-slate-500" />
-                <span>{todayFormatted}</span>
-              </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Total Invested Till Date: <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold text-xs sm:text-sm">{formatCurrency(totalCalculatedAccumulation)}</strong>
-            </p>
+          </div>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 flex items-center gap-1.5 shrink-0 font-mono">
+            <Calendar className="w-3.5 h-3.5 text-slate-500" />
+            <span>{todayFormatted}</span>
+          </span>
+        </div>
+
+        <div className="border-t border-slate-200/60 dark:border-slate-700/60 pt-3 flex items-end justify-between gap-4">
+          <div>
+            <span className="text-[10.5px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400 block">
+              Total Invested Till Date
+            </span>
+            <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+              {formatCurrency(totalCalculatedAccumulation)}
+            </span>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+              Monthly Commitment
+            </span>
+            <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400">
+              {formatCurrency(totalMonthlySipCommitment)}/mo
+            </span>
           </div>
         </div>
       </div>

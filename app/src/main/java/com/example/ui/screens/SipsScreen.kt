@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -106,6 +107,10 @@ fun SipsScreen(
         Calculations.calculateSipsTotal(filteredSips)
     }
 
+    val monthlyCommitment = remember(filteredSips) {
+        Calculations.calculateSipMonthlyCommitment(filteredSips)
+    }
+
     // Grouping sips by Platform with recent-first ordering for both platforms and entries
     val groupedSips = remember(filteredSips) {
         val platformOrder = mutableListOf<String>()
@@ -160,106 +165,160 @@ fun SipsScreen(
             item {
                 Spacer(modifier = Modifier.height(10.dp))
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("sips_summary_card"),
                     shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.52f)),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.70f)),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.68f)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.85f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(16.dp)
                     ) {
-                        // Mint green rounded square icon box
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFFD1FAE5)),
-                            contentAlignment = Alignment.Center
+                        // Top Header Row: Icon + Title & Status Badge on Left | Date Chip on Right
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_lucide_trending_up),
-                                contentDescription = null,
-                                tint = Color(0xFF059669),
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f, fill = false)
                             ) {
-                                Text(
-                                    text = "Active SIPs ($activeSipsCount)",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0F172A)
-                                )
-
-                                if (pausedSipsCount > 0) {
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Color(0xFFFEF3C7),
-                                        border = BorderStroke(0.8.dp, Color(0xFFFDE68A))
-                                    ) {
-                                        Text(
-                                            text = "$pausedSipsCount paused",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFFB45309),
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
+                                // Squircle Mint Icon with gradient
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            Brush.linearGradient(
+                                                listOf(Color(0xFFD1FAE5), Color(0xFFA7F3D0))
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_lucide_trending_up),
+                                        contentDescription = null,
+                                        tint = Color(0xFF047857),
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
 
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
 
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = Color.White.copy(alpha = 0.60f),
-                                    border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.80f))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.ic_lucide_calendar),
-                                            contentDescription = null,
-                                            tint = Color(0xFF64748B),
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = currentDateFormatted,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF475569)
-                                        )
+                                    Text(
+                                        text = "Active SIPs ($activeSipsCount)",
+                                        fontSize = 15.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF0F172A),
+                                        maxLines = 1
+                                    )
+
+                                    if (pausedSipsCount > 0) {
+                                        Surface(
+                                            shape = RoundedCornerShape(7.dp),
+                                            color = Color(0xFFFEF3C7),
+                                            border = BorderStroke(0.8.dp, Color(0xFFFDE68A))
+                                        ) {
+                                            Text(
+                                                text = "$pausedSipsCount paused",
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFB45309),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                maxLines = 1
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
 
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Date Badge on Right - Guaranteed single line without wrapping
+                            Surface(
+                                shape = RoundedCornerShape(9.dp),
+                                color = Color.White.copy(alpha = 0.85f),
+                                border = BorderStroke(0.8.dp, Color(0xFFE2E8F0))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_lucide_calendar),
+                                        contentDescription = null,
+                                        tint = Color(0xFF64748B),
+                                        modifier = Modifier.size(11.5.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = currentDateFormatted,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF475569),
+                                        fontFamily = FontFamily.Monospace,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(13.dp))
+
+                        HorizontalDivider(
+                            color = Color(0xFFE2E8F0).copy(alpha = 0.70f),
+                            thickness = 0.8.dp
+                        )
+
+                        Spacer(modifier = Modifier.height(11.dp))
+
+                        // Bottom Row: Total Invested Hero Metric + Monthly Active Commitment
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            Column {
                                 Text(
-                                    text = "Total Invested Till Date: ",
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF64748B)
+                                    text = "TOTAL INVESTED TILL DATE",
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF64748B),
+                                    letterSpacing = 0.5.sp
                                 )
+                                Spacer(modifier = Modifier.height(3.dp))
                                 Text(
                                     text = Calculations.formatCurrency(totalInvested),
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF0F172A)
+                                )
+                            }
+
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "MONTHLY COMMITMENT",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF94A3B8),
+                                    letterSpacing = 0.4.sp
+                                )
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = "${Calculations.formatCurrency(monthlyCommitment)}/mo",
                                     fontSize = 14.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFEA580C)
+                                    color = Color(0xFF059669)
                                 )
                             }
                         }
