@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.ui.components.ThemedDeleteDialog
 import androidx.compose.material.icons.Icons
@@ -68,7 +69,7 @@ fun SipsScreen(
     onAddSip: () -> Unit,
     onEditSip: (Sip) -> Unit,
     onDeleteSip: (Sip) -> Unit,
-    onTogglePauseSip: (Sip) -> Unit,
+    onTogglePauseSip: (Sip) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedFreq by remember { mutableStateOf("All") }
@@ -401,7 +402,7 @@ private fun SipPlatformGroupCard(
     platformInvestedTotal: Double,
     onEdit: (Sip) -> Unit,
     onDelete: (Sip) -> Unit,
-    onTogglePause: (Sip) -> Unit
+    onTogglePause: (Sip) -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -477,78 +478,19 @@ private fun SipPlatformGroupCard(
                         .fillMaxWidth()
                         .testTag("sip_item_${sip.id}")
                 ) {
-                    // Line 1: Instrument Name, Status Badge, Till Date & INVESTED Header + Amount
+                    // Line 1: Instrument Name, Till Date & INVESTED Header + Amount
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                        Text(
+                            text = sip.instrument.ifBlank { "SIP" },
+                            fontSize = 16.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (sip.isPaused) Color(0xFF64748B) else Color(0xFF0F172A),
                             modifier = Modifier.weight(1f, fill = false)
-                        ) {
-                            Text(
-                                text = sip.instrument.ifBlank { "SIP" },
-                                fontSize = 16.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (sip.isPaused) Color(0xFF64748B) else Color(0xFF0F172A)
-                            )
-
-                            Spacer(modifier = Modifier.width(6.dp))
-
-                            // Status Chip (ACTIVE vs PAUSED)
-                            if (sip.isPaused) {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFFFEF3C7),
-                                    border = BorderStroke(0.8.dp, Color(0xFFFDE68A))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.ic_lucide_pause),
-                                            contentDescription = null,
-                                            tint = Color(0xFFD97706),
-                                            modifier = Modifier.size(9.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = "PAUSED",
-                                            fontSize = 9.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFFB45309)
-                                        )
-                                    }
-                                }
-                            } else {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFFECFDF5),
-                                    border = BorderStroke(0.8.dp, Color(0xFFA7F3D0))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.ic_lucide_play),
-                                            contentDescription = null,
-                                            tint = Color(0xFF059669),
-                                            modifier = Modifier.size(8.5.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = "ACTIVE",
-                                            fontSize = 9.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF047857)
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        )
 
                         if (sip.since.isNotBlank()) {
                             Row(
@@ -622,86 +564,87 @@ private fun SipPlatformGroupCard(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Line 5: Action buttons (Pause/Resume, Edit, Del aligned to right)
+                    // Line 5: Read-only Status badge on left, Actions (Edit, Del) on right
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Pause / Resume Toggle Button
+                        // Read-only Status Chip (Non-clickable)
                         Surface(
                             shape = RoundedCornerShape(7.dp),
-                            color = if (sip.isPaused) Color(0xFFECFDF5) else Color(0xFFFFFBEB),
-                            border = BorderStroke(1.dp, if (sip.isPaused) Color(0xFFA7F3D0) else Color(0xFFFDE68A)),
-                            modifier = Modifier
-                                .height(26.dp)
-                                .clip(RoundedCornerShape(7.dp))
-                                .clickable { onTogglePause(sip) }
-                                .testTag("sip_toggle_pause_${sip.id}")
+                            color = if (sip.isPaused) Color(0xFFFEF3C7) else Color(0xFFECFDF5),
+                            border = BorderStroke(0.8.dp, if (sip.isPaused) Color(0xFFFDE68A) else Color(0xFFA7F3D0)),
+                            modifier = Modifier.testTag("sip_status_badge_${sip.id}")
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 8.dp),
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    painter = painterResource(if (sip.isPaused) R.drawable.ic_lucide_play else R.drawable.ic_lucide_pause),
-                                    contentDescription = if (sip.isPaused) "Resume SIP" else "Pause SIP",
-                                    tint = if (sip.isPaused) Color(0xFF059669) else Color(0xFFD97706),
-                                    modifier = Modifier.size(11.5.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(
+                                            color = if (sip.isPaused) Color(0xFFD97706) else Color(0xFF059669),
+                                            shape = CircleShape
+                                        )
                                 )
                                 Spacer(modifier = Modifier.width(4.5.dp))
                                 Text(
-                                    text = if (sip.isPaused) "Resume" else "Pause",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (sip.isPaused) Color(0xFF059669) else Color(0xFFD97706)
+                                    text = if (sip.isPaused) "Paused" else "Active",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (sip.isPaused) Color(0xFFB45309) else Color(0xFF047857)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(6.dp))
-
-                        // Edit Icon Button
-                        Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = Color(0xFFEFF6FF),
-                            border = BorderStroke(1.dp, Color(0xFFDBEAFE)),
-                            modifier = Modifier
-                                .size(26.dp)
-                                .clip(RoundedCornerShape(7.dp))
-                                .clickable { onEdit(sip) }
-                                .testTag("sip_edit_${sip.id}")
+                        // Action Buttons: Edit and Delete
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit",
-                                    tint = Color(0xFF2563EB),
-                                    modifier = Modifier.size(13.5.dp)
-                                )
+                            // Edit Icon Button
+                            Surface(
+                                shape = RoundedCornerShape(7.dp),
+                                color = Color(0xFFEFF6FF),
+                                border = BorderStroke(1.dp, Color(0xFFDBEAFE)),
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(RoundedCornerShape(7.dp))
+                                    .clickable { onEdit(sip) }
+                                    .testTag("sip_edit_${sip.id}")
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        tint = Color(0xFF2563EB),
+                                        modifier = Modifier.size(13.5.dp)
+                                    )
+                                }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
 
-                        // Del Icon Button
-                        Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = Color(0xFFFEF2F2),
-                            border = BorderStroke(1.dp, Color(0xFFFEE2E2)),
-                            modifier = Modifier
-                                .size(26.dp)
-                                .clip(RoundedCornerShape(7.dp))
-                                .clickable { onDelete(sip) }
-                                .testTag("sip_delete_${sip.id}")
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.DeleteOutline,
-                                    contentDescription = "Delete",
-                                    tint = Color(0xFFDC2626),
-                                    modifier = Modifier.size(13.5.dp)
-                                )
+                            // Del Icon Button
+                            Surface(
+                                shape = RoundedCornerShape(7.dp),
+                                color = Color(0xFFFEF2F2),
+                                border = BorderStroke(1.dp, Color(0xFFFEE2E2)),
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(RoundedCornerShape(7.dp))
+                                    .clickable { onDelete(sip) }
+                                    .testTag("sip_delete_${sip.id}")
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.DeleteOutline,
+                                        contentDescription = "Delete",
+                                        tint = Color(0xFFDC2626),
+                                        modifier = Modifier.size(13.5.dp)
+                                    )
+                                }
                             }
                         }
                     }

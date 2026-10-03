@@ -152,29 +152,6 @@ export const SipsTable: React.FC<SipsTableProps> = ({
                         </td>
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
                           <div className="flex items-center justify-center gap-1.5">
-                            {onTogglePause && (
-                              <button
-                                onClick={() => onTogglePause(item)}
-                                title={item.isPaused ? "Resume SIP" : "Pause SIP"}
-                                className={`p-1.5 rounded-xl border transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold ${
-                                  item.isPaused
-                                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
-                                    : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
-                                }`}
-                              >
-                                {item.isPaused ? (
-                                  <>
-                                    <Play className="w-3.5 h-3.5" />
-                                    <span>Resume</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Pause className="w-3.5 h-3.5" />
-                                    <span>Pause</span>
-                                  </>
-                                )}
-                              </button>
-                            )}
                             <button
                               onClick={() => onEdit(item)}
                               title="Edit"
@@ -206,20 +183,9 @@ export const SipsTable: React.FC<SipsTableProps> = ({
                   <div key={item.id} className="pt-3 first:pt-0 space-y-2">
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                            {item.instrument}
-                          </h4>
-                          {item.isPaused ? (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                              <Pause className="w-2.5 h-2.5" /> PAUSED
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
-                              <Play className="w-2.5 h-2.5" /> ACTIVE
-                            </span>
-                          )}
-                        </div>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                          {item.instrument}
+                        </h4>
                         <span className="text-xs text-slate-500">
                           ₹{item.amount.toLocaleString('en-IN')} /{item.frequency}
                         </span>
@@ -242,39 +208,29 @@ export const SipsTable: React.FC<SipsTableProps> = ({
                       </p>
                     )}
 
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      {onTogglePause && (
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                        item.isPaused
+                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                          : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${item.isPaused ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                        {item.isPaused ? 'Paused' : 'Active'}
+                      </span>
+                      <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => onTogglePause(item)}
-                          className={`px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
-                            item.isPaused
-                              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
-                              : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
-                          }`}
+                          onClick={() => onEdit(item)}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 text-xs font-semibold flex items-center gap-1 cursor-pointer hover:bg-blue-500/10 transition-colors"
                         >
-                          {item.isPaused ? (
-                            <>
-                              <Play className="w-3 h-3" /> Resume
-                            </>
-                          ) : (
-                            <>
-                              <Pause className="w-3 h-3" /> Pause
-                            </>
-                          )}
+                          <Pencil className="w-3.5 h-3.5" /> Edit
                         </button>
-                      )}
-                      <button
-                        onClick={() => onEdit(item)}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                      >
-                        <Pencil className="w-3.5 h-3.5" /> Edit
-                      </button>
-                      <button
-                        onClick={() => onDeleteRequest(item)}
-                        className="px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Del
-                      </button>
+                        <button
+                          onClick={() => onDeleteRequest(item)}
+                          className="px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-1 cursor-pointer hover:bg-red-500/10 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Del
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
