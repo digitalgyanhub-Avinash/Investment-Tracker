@@ -64,7 +64,7 @@ function doPost(e) {
         formatDateToDdMmYyyy(data.tillDate),
         data.remarks || "",
         new Date().toISOString()
-      ]);
+      ], [6]);
     } else if (action === "updateHolding") {
       updateRowById(holdingsSheet, id, [
         id,
@@ -75,7 +75,7 @@ function doPost(e) {
         formatDateToDdMmYyyy(data.tillDate),
         data.remarks || "",
         new Date().toISOString()
-      ]);
+      ], [6]);
     } else if (action === "deleteHolding") {
       deleteRowById(holdingsSheet, id);
     } else if (action === "addSip") {
@@ -88,7 +88,7 @@ function doPost(e) {
         formatDateToDdMmYyyy(data.since),
         data.remarks || "",
         new Date().toISOString()
-      ]);
+      ], [6]);
     } else if (action === "updateSip") {
       updateRowById(sipsSheet, id, [
         id,
@@ -99,19 +99,19 @@ function doPost(e) {
         formatDateToDdMmYyyy(data.since),
         data.remarks || "",
         new Date().toISOString()
-      ]);
+      ], [6]);
     } else if (action === "deleteSip") {
       deleteRowById(sipsSheet, id);
     } else if (action === "addCommittee") {
-      addRow(committeesSheet, formatCommitteeRow(data));
+      addRow(committeesSheet, formatCommitteeRow(data), [6]);
     } else if (action === "updateCommittee") {
-      updateRowById(committeesSheet, id, formatCommitteeRow(data));
+      updateRowById(committeesSheet, id, formatCommitteeRow(data), [6]);
     } else if (action === "deleteCommittee") {
       deleteRowById(committeesSheet, id);
     } else if (action === "addIpo") {
-      addRow(iposSheet, formatIpoRow(data));
+      addRow(iposSheet, formatIpoRow(data), [11, 12, 13, 14]);
     } else if (action === "updateIpo") {
-      updateRowById(iposSheet, id, formatIpoRow(data));
+      updateRowById(iposSheet, id, formatIpoRow(data), [11, 12, 13, 14]);
     } else if (action === "deleteIpo") {
       deleteRowById(iposSheet, id);
     } else if (action === "syncAll") {
@@ -128,7 +128,7 @@ function doPost(e) {
             h.remarks || "",
             new Date().toISOString()
           ];
-        }));
+        }), [6]);
       }
       if (contents.sips) {
         clearAndRewrite(sipsSheet, getSipsHeaders(), contents.sips.map(function(s) {
@@ -142,17 +142,17 @@ function doPost(e) {
             s.remarks || "",
             new Date().toISOString()
           ];
-        }));
+        }), [6]);
       }
       if (contents.committees) {
         clearAndRewrite(committeesSheet, getCommitteesHeaders(), contents.committees.map(function(c) {
           return formatCommitteeRow(c);
-        }));
+        }), [6]);
       }
       if (contents.ipos) {
         clearAndRewrite(iposSheet, getIposHeaders(), contents.ipos.map(function(i) {
           return formatIpoRow(i);
-        }));
+        }), [11, 12, 13, 14]);
       }
     }
 
@@ -339,10 +339,11 @@ function getOrCreateSheet(ss, name, headers, dateCols) {
     sheet = ss.insertSheet(name);
     sheet.appendRow(headers);
     sheet.getRange("1:1").setFontWeight("bold").setBackground("#f3f4f6");
-    if (dateCols && dateCols.length > 0) {
-      for (var k = 0; k < dateCols.length; k++) {
-        sheet.getRange(2, dateCols[k], 500, 1).setNumberFormat("@");
-      }
+  }
+  if (dateCols && dateCols.length > 0) {
+    var maxR = Math.max(sheet.getMaxRows(), 500);
+    for (var k = 0; k < dateCols.length; k++) {
+      sheet.getRange(2, dateCols[k], maxR - 1, 1).setNumberFormat("@");
     }
   }
   return sheet;
@@ -614,19 +615,36 @@ function formatIpoRow(data) {
   ];
 }
 
-function addRow(sheet, rowValues) {
+function addRow(sheet, rowValues, dateCols) {
   sheet.appendRow(rowValues);
+  if (dateCols && dateCols.length > 0) {
+    var lastRow = sheet.getLastRow();
+    for (var k = 0; k < dateCols.length; k++) {
+      sheet.getRange(lastRow, dateCols[k]).setNumberFormat("@");
+    }
+  }
 }
 
-function updateRowById(sheet, id, newRowValues) {
+function updateRowById(sheet, id, newRowValues, dateCols) {
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][0]) === String(id)) {
       sheet.getRange(i + 1, 1, 1, newRowValues.length).setValues([newRowValues]);
+      if (dateCols && dateCols.length > 0) {
+        for (var k = 0; k < dateCols.length; k++) {
+          sheet.getRange(i + 1, dateCols[k]).setNumberFormat("@");
+        }
+      }
       return true;
     }
   }
   sheet.appendRow(newRowValues);
+  if (dateCols && dateCols.length > 0) {
+    var lastRow = sheet.getLastRow();
+    for (var k = 0; k < dateCols.length; k++) {
+      sheet.getRange(lastRow, dateCols[k]).setNumberFormat("@");
+    }
+  }
   return false;
 }
 
@@ -641,13 +659,17 @@ function deleteRowById(sheet, id) {
   return false;
 }
 
-function clearAndRewrite(sheet, headers, rowsData) {
+function clearAndRewrite(sheet, headers, rowsData, dateCols) {
   sheet.clearContents();
   sheet.appendRow(headers);
   sheet.getRange("1:1").setFontWeight("bold").setBackground("#f3f4f6");
+  if (dateCols && dateCols.length > 0) {
+    var maxR = Math.max(rowsData ? rowsData.length + 50 : 200, 200);
+    for (var k = 0; k < dateCols.length; k++) {
+      sheet.getRange(2, dateCols[k], maxR, 1).setNumberFormat("@");
+    }
+  }
   if (rowsData && rowsData.length > 0) {
-    // Format all columns as '@' Plain Text so Google Sheets NEVER treats dates as US dates
-    sheet.getRange(2, 1, Math.max(rowsData.length, 100), headers.length).setNumberFormat("@");
     sheet.getRange(2, 1, rowsData.length, headers.length).setValues(rowsData);
   }
 }

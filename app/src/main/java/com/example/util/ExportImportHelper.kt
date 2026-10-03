@@ -95,7 +95,22 @@ object ExportImportHelper {
         val committees = mutableListOf<Committee>()
 
         var currentSection = "HOLDINGS"
+        var currentHeaderMap = mutableMapOf<String, Int>()
         val lines = csvText.lines()
+
+        fun normalizeKey(s: String) = s.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]"), "")
+
+        fun getCol(tokens: List<String>, vararg keys: String, defaultIdx: Int): String {
+            for (k in keys) {
+                val nk = normalizeKey(k)
+                val idx = currentHeaderMap[nk]
+                if (idx != null && idx < tokens.size) {
+                    val v = tokens[idx].trim()
+                    if (v.isNotBlank()) return v
+                }
+            }
+            return tokens.getOrNull(defaultIdx)?.trim() ?: ""
+        }
 
         for (rawLine in lines) {
             val line = rawLine.trim()
@@ -104,52 +119,80 @@ object ExportImportHelper {
             val upper = line.uppercase()
             if (upper.startsWith("SECTION,HOLDINGS")) {
                 currentSection = "HOLDINGS"
+                currentHeaderMap.clear()
                 continue
             } else if (upper.startsWith("SECTION,SIPS")) {
                 currentSection = "SIPS"
+                currentHeaderMap.clear()
                 continue
             } else if (upper.startsWith("SECTION,IPOS")) {
                 currentSection = "IPOS"
+                currentHeaderMap.clear()
                 continue
             } else if (upper.startsWith("SECTION,COMMITTEES")) {
                 currentSection = "COMMITTEES"
+                currentHeaderMap.clear()
                 continue
             }
 
             // Auto-detect section if header row is present without SECTION prefix
             if (upper.contains("INSTRUMENT") || upper.contains("FREQUENCY") || (upper.contains("SINCE") && !upper.contains("TOTALMEMBERS"))) {
                 currentSection = "SIPS"
+                currentHeaderMap.clear()
+                val parsedHeader = parseCsvLine(line)
+                parsedHeader.forEachIndexed { i, col -> currentHeaderMap[normalizeKey(col)] = i }
                 continue
             } else if (upper.contains("COMPANYNAME") || upper.contains("SHARESPERLOT") || upper.contains("CUTOFFPRICE") || upper.contains("APPLYDATE")) {
                 currentSection = "IPOS"
+                currentHeaderMap.clear()
+                val parsedHeader = parseCsvLine(line)
+                parsedHeader.forEachIndexed { i, col -> currentHeaderMap[normalizeKey(col)] = i }
                 continue
             } else if (upper.contains("TOTALMEMBERS") || upper.contains("TOTALMONTHS") || upper.contains("BASEINSTALLMENT") || upper.contains("HASTAKENPOT")) {
                 currentSection = "COMMITTEES"
+                currentHeaderMap.clear()
+                val parsedHeader = parseCsvLine(line)
+                parsedHeader.forEachIndexed { i, col -> currentHeaderMap[normalizeKey(col)] = i }
                 continue
             } else if (upper.contains("CATEGORY") && (upper.contains("BREAKDOWN") || upper.contains("TILLDATE") || upper.contains("TILL DATE") || upper.contains("TOTAL"))) {
                 currentSection = "HOLDINGS"
+                currentHeaderMap.clear()
+                val parsedHeader = parseCsvLine(line)
+                parsedHeader.forEachIndexed { i, col -> currentHeaderMap[normalizeKey(col)] = i }
                 continue
             }
 
-            // Skip any other generic header lines
+            // Detect any other generic header lines
             if (upper.startsWith("PLATFORM,") || upper.startsWith("COMPANY,") || upper.startsWith("NAME,") || upper.startsWith("ID,")) {
+                val parsedHeader = parseCsvLine(line)
+                currentHeaderMap.clear()
+                parsedHeader.forEachIndexed { i, col -> currentHeaderMap[normalizeKey(col)] = i }
                 continue
             }
 
             val tokens = parseCsvLine(line)
             if (tokens.isEmpty()) continue
 
+            // Determine if row has a leading ID column (e.g. h-1234, s-5678, comm-999, ipo-888 or uuid)
+            val firstToken = tokens.getOrNull(0)?.trim() ?: ""
+            val hasLeadingId = firstToken.startsWith("h-") || firstToken.startsWith("s-") ||
+                    firstToken.startsWith("comm-") || firstToken.startsWith("ipo-") ||
+                    (firstToken.length >= 30 && firstToken.contains("-"))
+            val idOffset = if (hasLeadingId) 1 else 0
+
             try {
                 when (currentSection) {
                     "HOLDINGS" -> {
                         if (tokens.size >= 2) {
-                            val platform = tokens.getOrNull(0)?.ifBlank { "Portfolio" } ?: "Portfolio"
-                            val category = tokens.getOrNull(1)?.ifBlank { "General" } ?: "General"
-                            val total = tokens.getOrNull(2)?.toDoubleOrNull() ?: 0.0
-                            val rawDate = tokens.getOrNull(3)?.ifBlank { SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date()) } ?: ""
-                            val tillDate = Calculations.normalizeDateToDdMmYyyy(rawDate)
-                            val breakdownRaw = tokens.getOrNull(4) ?: ""
-                            val remarks = tokens.getOrNull(5) ?: ""
+                            val platform = getCol(tokens, "platform", "broker", defaultIdx = 0 + idOffset).ifBlank { "Portfolio" }
+                            val category = getCol(tokens, "category", "type", "asset", defaultIdx = 1 + idOffset).ifBlank { "General" }
+                            val total = getCol(tokens, "total", "amount", "value", defaultIdx = if (hasLeadingId) 4 else 2).toDoubleOrNull() ?: 0.0
+                            val rawDate = getCol(tokens, "tilldate", "till", "date", "asofdate", defaultIdx = if (hasLeadingId) 5 else 3)
+                            val tillDate = Calculations.normalizeDateToDdMmYyyy(rawDate).ifBlank {
+                                SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date())
+                            }
+                            val breakdownRaw = getCol(tokens, "breakdown", "items", "details", defaultIdx = if (hasLeadingId) 3 else 4)
+                            val remarks = getCol(tokens, "remarks", "remark", "notes", "note", defaultIdx = if (hasLeadingId) 6 else 5)
                             holdings.add(
                                 Holding(
                                     id = UUID.randomUUID().toString(),
@@ -165,15 +208,17 @@ object ExportImportHelper {
                     }
                     "SIPS" -> {
                         if (tokens.size >= 3) {
-                            val platform = tokens.getOrNull(0)?.ifBlank { "Groww" } ?: "Groww"
-                            val instrument = tokens.getOrNull(1)?.ifBlank { "Mutual Fund" } ?: "Mutual Fund"
-                            val amount = tokens.getOrNull(2)?.toDoubleOrNull() ?: 1000.0
-                            val frequency = tokens.getOrNull(3)?.ifBlank { "Monthly" } ?: "Monthly"
-                            val rawSince = tokens.getOrNull(4)?.ifBlank { SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date()) } ?: ""
-                            val since = Calculations.normalizeDateToDdMmYyyy(rawSince)
-                            val remarks = tokens.getOrNull(5) ?: ""
-                            val rawStatus = tokens.getOrNull(6)?.trim() ?: ""
-                            val isPaused = rawStatus.equals("Paused", ignoreCase = true)
+                            val platform = getCol(tokens, "platform", "broker", "source", defaultIdx = 0 + idOffset).ifBlank { "Groww" }
+                            val instrument = getCol(tokens, "instrument", "fund", "name", "scheme", defaultIdx = 1 + idOffset).ifBlank { "Mutual Fund" }
+                            val amount = getCol(tokens, "amount", "monthlyamount", "value", defaultIdx = 2 + idOffset).toDoubleOrNull() ?: 1000.0
+                            val frequency = getCol(tokens, "frequency", "freq", "period", defaultIdx = 3 + idOffset).ifBlank { "Monthly" }
+                            val rawSince = getCol(tokens, "since", "sincedate", "startdate", "date", defaultIdx = 4 + idOffset)
+                            val since = Calculations.normalizeDateToDdMmYyyy(rawSince).ifBlank {
+                                SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date())
+                            }
+                            val remarks = getCol(tokens, "remarks", "remark", "notes", "note", defaultIdx = 5 + idOffset)
+                            val rawStatus = getCol(tokens, "status", "state", "ispaused", defaultIdx = 6 + idOffset)
+                            val isPaused = rawStatus.equals("Paused", ignoreCase = true) || rawStatus.equals("true", ignoreCase = true)
                             sips.add(
                                 Sip(
                                     id = UUID.randomUUID().toString(),
@@ -190,30 +235,23 @@ object ExportImportHelper {
                     }
                     "IPOS" -> {
                         if (tokens.size >= 3) {
-                            val company = tokens.getOrNull(0)?.ifBlank { "IPO Application" } ?: "IPO Application"
-                            val category = tokens.getOrNull(1)?.ifBlank { "Mainboard" } ?: "Mainboard"
-                            val platform = tokens.getOrNull(2)?.ifBlank { "Zerodha" } ?: "Zerodha"
-                            val applicant = tokens.getOrNull(3)?.ifBlank { "Self" } ?: "Self"
-                            val sharesPerLot = tokens.getOrNull(4)?.toIntOrNull() ?: 1
-                            val cutOffPrice = tokens.getOrNull(5)?.toDoubleOrNull() ?: 0.0
-                            val lotsApplied = tokens.getOrNull(6)?.toIntOrNull() ?: 1
-                            val totalAmount = tokens.getOrNull(7)?.toDoubleOrNull() ?: (cutOffPrice * sharesPerLot * lotsApplied)
-                            val rawApplyDate = tokens.getOrNull(8)?.ifBlank { SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date()) } ?: ""
-                            val applyDate = Calculations.normalizeDateToDdMmYyyy(rawApplyDate)
-                            val allotmentDate = Calculations.normalizeDateToDdMmYyyy(tokens.getOrNull(9) ?: "")
-                            val (listingDate, status, remarks) = if (tokens.size >= 13) {
-                                Triple(
-                                    Calculations.normalizeDateToDdMmYyyy(tokens.getOrNull(10) ?: ""),
-                                    tokens.getOrNull(11)?.ifBlank { "Applied" } ?: "Applied",
-                                    tokens.getOrNull(12) ?: ""
-                                )
-                            } else {
-                                Triple(
-                                    "",
-                                    tokens.getOrNull(10)?.ifBlank { "Applied" } ?: "Applied",
-                                    tokens.getOrNull(11) ?: ""
-                                )
+                            val company = getCol(tokens, "companyname", "company", "name", defaultIdx = 0 + idOffset).ifBlank { "IPO Application" }
+                            val category = getCol(tokens, "segment", "category", defaultIdx = 1 + idOffset).ifBlank { "Mainboard" }
+                            val platform = getCol(tokens, "platform", "broker", defaultIdx = 2 + idOffset).ifBlank { "Zerodha" }
+                            val applicant = getCol(tokens, "applicant", "applicantname", defaultIdx = 3 + idOffset).ifBlank { "Self" }
+                            val sharesPerLot = getCol(tokens, "shareslot", "sharesperlot", "shares", defaultIdx = 4 + idOffset).toIntOrNull() ?: 1
+                            val cutOffPrice = getCol(tokens, "cutoffprice", "price", defaultIdx = 5 + idOffset).toDoubleOrNull() ?: 0.0
+                            val lotsApplied = getCol(tokens, "lotsapplied", "lots", defaultIdx = 6 + idOffset).toIntOrNull() ?: 1
+                            val totalAmount = getCol(tokens, "amountblocked", "totalamountblocked", "total", defaultIdx = 7 + idOffset).toDoubleOrNull()
+                                ?: (cutOffPrice * sharesPerLot * lotsApplied)
+                            val rawApplyDate = getCol(tokens, "applydate", "apply", "date", defaultIdx = 8 + idOffset)
+                            val applyDate = Calculations.normalizeDateToDdMmYyyy(rawApplyDate).ifBlank {
+                                SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date())
                             }
+                            val allotmentDate = Calculations.normalizeDateToDdMmYyyy(getCol(tokens, "allotmentdate", "allotment", defaultIdx = 9 + idOffset))
+                            val listingDate = Calculations.normalizeDateToDdMmYyyy(getCol(tokens, "listingdate", "listing", defaultIdx = 10 + idOffset))
+                            val status = getCol(tokens, "status", defaultIdx = 11 + idOffset).ifBlank { "Applied" }
+                            val remarks = getCol(tokens, "remarks", "remark", "notes", "note", defaultIdx = 12 + idOffset)
                             ipos.add(
                                 Ipo(
                                     id = UUID.randomUUID().toString(),
@@ -236,15 +274,17 @@ object ExportImportHelper {
                     }
                     "COMMITTEES" -> {
                         if (tokens.size >= 2) {
-                            val name = tokens.getOrNull(0)?.ifBlank { "Committee" } ?: "Committee"
-                            val totalAmount = tokens.getOrNull(1)?.toDoubleOrNull() ?: 100000.0
-                            val members = tokens.getOrNull(2)?.toIntOrNull() ?: 12
-                            val months = tokens.getOrNull(3)?.toIntOrNull() ?: members
-                            val rawStartDate = tokens.getOrNull(4)?.ifBlank { SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date()) } ?: ""
-                            val startDate = Calculations.normalizeDateToDdMmYyyy(rawStartDate)
-                            val baseInstallment = tokens.getOrNull(5)?.toDoubleOrNull() ?: (totalAmount / members)
-                            val currentMonth = tokens.getOrNull(6)?.toIntOrNull() ?: 1
-                            val remarks = tokens.getOrNull(7) ?: ""
+                            val name = getCol(tokens, "name", "committee", defaultIdx = 0 + idOffset).ifBlank { "Committee" }
+                            val totalAmount = getCol(tokens, "totalamount", "amount", "total", defaultIdx = 1 + idOffset).toDoubleOrNull() ?: 100000.0
+                            val members = getCol(tokens, "totalmembers", "members", defaultIdx = 2 + idOffset).toIntOrNull() ?: 12
+                            val months = getCol(tokens, "totalmonths", "months", defaultIdx = 3 + idOffset).toIntOrNull() ?: members
+                            val rawStartDate = getCol(tokens, "startdate", "start", "date", defaultIdx = 4 + idOffset)
+                            val startDate = Calculations.normalizeDateToDdMmYyyy(rawStartDate).ifBlank {
+                                SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date())
+                            }
+                            val baseInstallment = getCol(tokens, "baseinstallment", "installment", defaultIdx = 5 + idOffset).toDoubleOrNull() ?: (totalAmount / members)
+                            val currentMonth = getCol(tokens, "currentmonth", defaultIdx = 6 + idOffset).toIntOrNull() ?: 1
+                            val remarks = getCol(tokens, "remarks", "remark", "notes", "note", defaultIdx = 7 + idOffset)
                             committees.add(
                                 Committee(
                                     id = UUID.randomUUID().toString(),

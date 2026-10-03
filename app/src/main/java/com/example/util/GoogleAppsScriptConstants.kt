@@ -68,7 +68,7 @@ function doPost(e) {
         formatDateToDdMmYyyy(data.tillDate),
         data.remarks || "",
         new Date().toISOString()
-      ]);
+      ], [6]);
     } else if (action === "updateHolding") {
       updateRowById(holdingsSheet, id, [
         id,
@@ -79,7 +79,7 @@ function doPost(e) {
         formatDateToDdMmYyyy(data.tillDate),
         data.remarks || "",
         new Date().toISOString()
-      ]);
+      ], [6]);
     } else if (action === "deleteHolding") {
       deleteRowById(holdingsSheet, id);
     } else if (action === "addSip") {
@@ -93,7 +93,7 @@ function doPost(e) {
         data.remarks || "",
         data.isPaused ? "Paused" : "Active",
         new Date().toISOString()
-      ]);
+      ], [6]);
     } else if (action === "updateSip") {
       updateRowById(sipsSheet, id, [
         id,
@@ -105,19 +105,19 @@ function doPost(e) {
         data.remarks || "",
         data.isPaused ? "Paused" : "Active",
         new Date().toISOString()
-      ]);
+      ], [6]);
     } else if (action === "deleteSip") {
       deleteRowById(sipsSheet, id);
     } else if (action === "addCommittee") {
-      addRow(committeesSheet, formatCommitteeRow(data));
+      addRow(committeesSheet, formatCommitteeRow(data), [6]);
     } else if (action === "updateCommittee") {
-      updateRowById(committeesSheet, id, formatCommitteeRow(data));
+      updateRowById(committeesSheet, id, formatCommitteeRow(data), [6]);
     } else if (action === "deleteCommittee") {
       deleteRowById(committeesSheet, id);
     } else if (action === "addIpo") {
-      addRow(iposSheet, formatIpoRow(data));
+      addRow(iposSheet, formatIpoRow(data), [11, 12, 13, 14]);
     } else if (action === "updateIpo") {
-      updateRowById(iposSheet, id, formatIpoRow(data));
+      updateRowById(iposSheet, id, formatIpoRow(data), [11, 12, 13, 14]);
     } else if (action === "deleteIpo") {
       deleteRowById(iposSheet, id);
     } else if (action === "syncAll") {
@@ -133,7 +133,7 @@ function doPost(e) {
             h.remarks || "",
             new Date().toISOString()
           ];
-        }));
+        }), [6]);
       }
       if (contents.sips) {
         clearAndRewrite(sipsSheet, getSipsHeaders(), contents.sips.map(function(s) {
@@ -148,17 +148,17 @@ function doPost(e) {
             s.isPaused ? "Paused" : "Active",
             new Date().toISOString()
           ];
-        }));
+        }), [6]);
       }
       if (contents.committees) {
         clearAndRewrite(committeesSheet, getCommitteesHeaders(), contents.committees.map(function(c) {
           return formatCommitteeRow(c);
-        }));
+        }), [6]);
       }
       if (contents.ipos) {
         clearAndRewrite(iposSheet, getIposHeaders(), contents.ipos.map(function(i) {
           return formatIpoRow(i);
-        }));
+        }), [11, 12, 13, 14]);
       }
     }
 
@@ -219,16 +219,21 @@ function getColIdx(headerMap, possibleKeys, defaultIdx) {
 
 // Format any date value into strict DD-MM-YYYY format
 function formatDateToDdMmYyyy(val, displayVal) {
+  // 1. Check formatted display value first if available (preserves exact user entry on sheet)
   if (displayVal !== undefined && displayVal !== null) {
     var strDisplay = String(displayVal).trim();
     if (strDisplay && strDisplay !== "-" && strDisplay !== "—" && strDisplay !== "N/A" && strDisplay.toLowerCase() !== "null" && strDisplay.toLowerCase() !== "undefined") {
-      var dmy = strDisplay.match(/^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})$/);
+      // Check DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY (support 2 or 4 digit years)
+      var dmy = strDisplay.match(/^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2,4})(?:[ T].*)?$/);
       if (dmy) {
         var p1 = Number(dmy[1]);
         var p2 = Number(dmy[2]);
-        var yr = dmy[3];
+        var yr = Number(dmy[3]);
+        if (yr < 100) yr += 2000;
         var dVal = p1;
         var mVal = p2;
+        // In Indian context (Investment Tracker), DD-MM-YYYY is standard
+        // Only if second part > 12 can it be US MM/DD/YYYY format
         if (p2 > 12) {
           dVal = p2;
           mVal = p1;
@@ -236,7 +241,8 @@ function formatDateToDdMmYyyy(val, displayVal) {
         return (dVal < 10 ? "0" + dVal : "" + dVal) + "-" + (mVal < 10 ? "0" + mVal : "" + mVal) + "-" + yr;
       }
 
-      var ymd = strDisplay.match(/^(\d{4})[-/. ](\d{1,2})[-/. ](\d{1,2})$/);
+      // Check YYYY-MM-DD or YYYY/MM/DD
+      var ymd = strDisplay.match(/^(\d{4})[-/. ](\d{1,2})[-/. ](\d{1,2})(?:[ T].*)?$/);
       if (ymd) {
         var y4 = ymd[1];
         var m2 = Number(ymd[2]);
@@ -248,41 +254,83 @@ function formatDateToDdMmYyyy(val, displayVal) {
 
   if (val === undefined || val === null || val === "") return "";
 
+  // 2. If val is a Date object (NEVER use val.getDate() as it uses script engine's US/UTC timezone and causes 1-day shifts!)
   if (Object.prototype.toString.call(val) === "[object Date]" || val instanceof Date) {
     if (isNaN(val.getTime())) return "";
-    var tz = Session.getScriptTimeZone() || SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() || "Asia/Kolkata";
+    var tz = "Asia/Kolkata";
+    try {
+      var activeSs = SpreadsheetApp.getActiveSpreadsheet();
+      if (activeSs) tz = activeSs.getSpreadsheetTimeZone() || "Asia/Kolkata";
+    } catch(e) {}
     return Utilities.formatDate(val, tz, "dd-MM-yyyy");
   }
 
-  if (typeof val === "number") {
-    if (val >= 20000 && val <= 80000) {
-      var epochMillis = Math.round((val - 25569) * 86400 * 1000);
-      var dateObj = new Date(epochMillis);
-      if (!isNaN(dateObj.getTime())) {
-        var tzNum = Session.getScriptTimeZone() || SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() || "Asia/Kolkata";
-        return Utilities.formatDate(dateObj, tzNum, "dd-MM-yyyy");
-      }
+  // 3. If val is a number (e.g. Excel/Google Sheets serial date)
+  if (typeof val === "number" && val >= 20000 && val <= 80000) {
+    var epochMillis = Math.round((val - 25569) * 86400 * 1000);
+    var dateObj = new Date(epochMillis);
+    if (!isNaN(dateObj.getTime())) {
+      var tzNum = "Asia/Kolkata";
+      try {
+        var activeSs2 = SpreadsheetApp.getActiveSpreadsheet();
+        if (activeSs2) tzNum = activeSs2.getSpreadsheetTimeZone() || "Asia/Kolkata";
+      } catch(e) {}
+      return Utilities.formatDate(dateObj, tzNum, "dd-MM-yyyy");
     }
   }
 
+  // 4. String format processing
   var str = String(val).trim();
   if (!str || str === "-" || str === "—" || str === "N/A" || str.toLowerCase() === "undefined" || str.toLowerCase() === "null") {
     return "";
   }
 
+  // Strip wrapping quotes
   str = str.replace(/^["']|["']$/g, "").trim();
 
-  var dmyMatch = str.match(/^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})(?:[ T].*)?$/);
+  // Textual month names (e.g. "19-Aug-2026", "19 August 2026", "Aug 19, 2026", "19-Aug-26")
+  var monthsMap = {
+    jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
+    may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, september: 9,
+    oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12
+  };
+  var textMonthMatch1 = str.match(/^(\d{1,2})[-/ ]([A-Za-z]+)[-/ ](\d{2,4})(?:[ T].*)?$/);
+  if (textMonthMatch1) {
+    var d = Number(textMonthMatch1[1]);
+    var mName = textMonthMatch1[2].toLowerCase();
+    var y = Number(textMonthMatch1[3]);
+    if (y < 100) y += 2000;
+    if (monthsMap[mName]) {
+      var m = monthsMap[mName];
+      return (d < 10 ? "0" + d : "" + d) + "-" + (m < 10 ? "0" + m : "" + m) + "-" + y;
+    }
+  }
+  var textMonthMatch2 = str.match(/^([A-Za-z]+)\s+(\d{1,2})[-, \/]+(\d{2,4})(?:[ T].*)?$/);
+  if (textMonthMatch2) {
+    var mName2 = textMonthMatch2[1].toLowerCase();
+    var d2 = Number(textMonthMatch2[2]);
+    var y2 = Number(textMonthMatch2[3]);
+    if (y2 < 100) y2 += 2000;
+    if (monthsMap[mName2]) {
+      var m2 = monthsMap[mName2];
+      return (d2 < 10 ? "0" + d2 : "" + d2) + "-" + (m2 < 10 ? "0" + m2 : "" + m2) + "-" + y2;
+    }
+  }
+
+  // Check DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY
+  var dmyMatch = str.match(/^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2,4})(?:[ T].*)?$/);
   if (dmyMatch) {
     var part1 = Number(dmyMatch[1]);
     var part2 = Number(dmyMatch[2]);
-    var year = dmyMatch[3];
+    var year = Number(dmyMatch[3]);
+    if (year < 100) year += 2000;
     var day = part1;
     var month = part2;
     if (part2 > 12) { day = part2; month = part1; }
     return (day < 10 ? "0" + day : "" + day) + "-" + (month < 10 ? "0" + month : "" + month) + "-" + year;
   }
 
+  // Check YYYY-MM-DD or YYYY/MM/DD
   var ymdMatch = str.match(/^(\d{4})[-/. ](\d{1,2})[-/. ](\d{1,2})(?:[ T].*)?$/);
   if (ymdMatch) {
     var yYear = ymdMatch[1];
@@ -291,17 +339,27 @@ function formatDateToDdMmYyyy(val, displayVal) {
     return (dDay < 10 ? "0" + dDay : "" + dDay) + "-" + (mMonth < 10 ? "0" + mMonth : "" + mMonth) + "-" + yYear;
   }
 
+  // Check ISO string
   if (str.indexOf("T") !== -1) {
     var parsedIso = new Date(str);
     if (!isNaN(parsedIso.getTime())) {
-      var tzIso = Session.getScriptTimeZone() || SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() || "Asia/Kolkata";
+      var tzIso = "Asia/Kolkata";
+      try {
+        var activeSs3 = SpreadsheetApp.getActiveSpreadsheet();
+        if (activeSs3) tzIso = activeSs3.getSpreadsheetTimeZone() || "Asia/Kolkata";
+      } catch(e) {}
       return Utilities.formatDate(parsedIso, tzIso, "dd-MM-yyyy");
     }
   }
 
+  // Check textual date fallback
   var parsedText = new Date(str);
   if (!isNaN(parsedText.getTime())) {
-    var tzText = Session.getScriptTimeZone() || SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() || "Asia/Kolkata";
+    var tzText = "Asia/Kolkata";
+    try {
+      var activeSs4 = SpreadsheetApp.getActiveSpreadsheet();
+      if (activeSs4) tzText = activeSs4.getSpreadsheetTimeZone() || "Asia/Kolkata";
+    } catch(e) {}
     return Utilities.formatDate(parsedText, tzText, "dd-MM-yyyy");
   }
 
@@ -330,10 +388,11 @@ function getOrCreateSheet(ss, name, headers, dateCols) {
     sheet = ss.insertSheet(name);
     sheet.appendRow(headers);
     sheet.getRange("1:1").setFontWeight("bold").setBackground("#f3f4f6");
-    if (dateCols && dateCols.length > 0) {
-      for (var k = 0; k < dateCols.length; k++) {
-        sheet.getRange(2, dateCols[k], 500, 1).setNumberFormat("@");
-      }
+  }
+  if (dateCols && dateCols.length > 0) {
+    var maxR = Math.max(sheet.getMaxRows(), 500);
+    for (var k = 0; k < dateCols.length; k++) {
+      sheet.getRange(2, dateCols[k], maxR - 1, 1).setNumberFormat("@");
     }
   }
   return sheet;
@@ -609,19 +668,36 @@ function formatIpoRow(data) {
   ];
 }
 
-function addRow(sheet, rowValues) {
+function addRow(sheet, rowValues, dateCols) {
   sheet.appendRow(rowValues);
+  if (dateCols && dateCols.length > 0) {
+    var lastRow = sheet.getLastRow();
+    for (var k = 0; k < dateCols.length; k++) {
+      sheet.getRange(lastRow, dateCols[k]).setNumberFormat("@");
+    }
+  }
 }
 
-function updateRowById(sheet, id, newRowValues) {
+function updateRowById(sheet, id, newRowValues, dateCols) {
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][0]) === String(id)) {
       sheet.getRange(i + 1, 1, 1, newRowValues.length).setValues([newRowValues]);
+      if (dateCols && dateCols.length > 0) {
+        for (var k = 0; k < dateCols.length; k++) {
+          sheet.getRange(i + 1, dateCols[k]).setNumberFormat("@");
+        }
+      }
       return true;
     }
   }
   sheet.appendRow(newRowValues);
+  if (dateCols && dateCols.length > 0) {
+    var lastRow = sheet.getLastRow();
+    for (var k = 0; k < dateCols.length; k++) {
+      sheet.getRange(lastRow, dateCols[k]).setNumberFormat("@");
+    }
+  }
   return false;
 }
 
@@ -636,12 +712,17 @@ function deleteRowById(sheet, id) {
   return false;
 }
 
-function clearAndRewrite(sheet, headers, rowsData) {
+function clearAndRewrite(sheet, headers, rowsData, dateCols) {
   sheet.clearContents();
   sheet.appendRow(headers);
   sheet.getRange("1:1").setFontWeight("bold").setBackground("#f3f4f6");
+  if (dateCols && dateCols.length > 0) {
+    var maxR = Math.max(rowsData ? rowsData.length + 50 : 200, 200);
+    for (var k = 0; k < dateCols.length; k++) {
+      sheet.getRange(2, dateCols[k], maxR, 1).setNumberFormat("@");
+    }
+  }
   if (rowsData && rowsData.length > 0) {
-    sheet.getRange(2, 1, Math.max(rowsData.length, 100), headers.length).setNumberFormat("@");
     sheet.getRange(2, 1, rowsData.length, headers.length).setValues(rowsData);
   }
 }

@@ -75,7 +75,7 @@ object Calculations {
             for (pattern in isoPatterns) {
                 try {
                     val sdf = SimpleDateFormat(pattern, Locale.ENGLISH).apply {
-                        timeZone = if (pattern.contains("'Z'")) TimeZone.getTimeZone("UTC") else TimeZone.getDefault()
+                        timeZone = TimeZone.getTimeZone("UTC")
                         isLenient = false
                     }
                     val parsed = sdf.parse(trimmed)
@@ -118,26 +118,26 @@ object Calculations {
             }
         }
 
-        // 2. Pure Year-Month-Day without time (e.g. "2026-08-19", "2026/08/19", "2026.08.19")
-        val yyyyMmDdRegex = Regex("^(\\d{4})[-/. ](\\d{1,2})[-/. ](\\d{1,2})$")
+        // 2. Pure Year-Month-Day with or without time (e.g. "2026-08-19", "2026/08/19", "2026.08.19", "2026-08-19 00:00:00")
+        val yyyyMmDdRegex = Regex("^(\\d{4})[-/. ](\\d{1,2})[-/. ](\\d{1,2})(?:[ T].*)?$")
         val matchYmd = yyyyMmDdRegex.matchEntire(trimmed)
         if (matchYmd != null) {
-            val (y, m, d) = matchYmd.destructured
-            val day = d.toInt()
-            val month = m.toInt()
-            val year = y.toInt()
-            if (month in 1..12 && day in 1..31) {
-                return String.format(Locale.ROOT, "%02d-%02d-%04d", day, month, year)
+            val y = matchYmd.groupValues[1].toInt()
+            val m = matchYmd.groupValues[2].toInt()
+            val d = matchYmd.groupValues[3].toInt()
+            if (m in 1..12 && d in 1..31) {
+                return String.format(Locale.ROOT, "%02d-%02d-%04d", d, m, y)
             }
         }
 
-        // 3. Day-Month-Year OR Month-Day-Year (e.g. "19-08-2026", "08/19/2026", "19/08/2026", "19.08.2026")
-        val dmyRegex = Regex("^(\\d{1,2})[-/. ](\\d{1,2})[-/. ](\\d{4})$")
+        // 3. Day-Month-Year OR Month-Day-Year with or without time (e.g. "19-08-2026", "08/19/2026", "19/08/2026", "19.08.2026", "03-10-26", "03/10/2026 00:00:00")
+        val dmyRegex = Regex("^(\\d{1,2})[-/. ](\\d{1,2})[-/. ](\\d{2,4})(?:[ T].*)?$")
         val matchDmy = dmyRegex.matchEntire(trimmed)
         if (matchDmy != null) {
             val part1 = matchDmy.groupValues[1].toInt()
             val part2 = matchDmy.groupValues[2].toInt()
-            val year = matchDmy.groupValues[3].toInt()
+            var year = matchDmy.groupValues[3].toInt()
+            if (year < 100) year += 2000
 
             val (day, month) = when {
                 // If part1 > 12, part1 MUST be day (e.g. 19-08-2026 or 19/08/2026)
@@ -186,24 +186,26 @@ object Calculations {
         }
 
         // 6. Formats with textual month names:
-        // E.g. "19-Aug-2026", "19 Aug 2026", "19-August-2026", "19 August 2026"
-        val dayMonthTextRegex = Regex("^(\\d{1,2})[-/ ]([A-Za-z]+)[-/ ](\\d{4})")
-        val matchDmt = dayMonthTextRegex.find(trimmed)
+        // E.g. "19-Aug-2026", "19 Aug 2026", "19-August-2026", "19 August 2026", "19-Aug-26"
+        val dayMonthTextRegex = Regex("^(\\d{1,2})[-/ ]([A-Za-z]+)[-/ ](\\d{2,4})(?:[ T].*)?$")
+        val matchDmt = dayMonthTextRegex.matchEntire(trimmed) ?: dayMonthTextRegex.find(trimmed)
         if (matchDmt != null) {
             val day = matchDmt.groupValues[1].toIntOrNull() ?: 1
             val monthStr = matchDmt.groupValues[2]
-            val year = matchDmt.groupValues[3].toIntOrNull() ?: 2026
+            var year = matchDmt.groupValues[3].toIntOrNull() ?: 2026
+            if (year < 100) year += 2000
             val month = monthNameToNumber(monthStr)
             return String.format(Locale.ROOT, "%02d-%02d-%04d", day, month, year)
         }
 
         // E.g. "Aug 19, 2026", "August 19, 2026", "Aug 19 2026"
-        val monthDayTextRegex = Regex("^([A-Za-z]+)\\s+(\\d{1,2})[-,\\s]+(\\d{4})")
-        val matchMdt = monthDayTextRegex.find(trimmed)
+        val monthDayTextRegex = Regex("^([A-Za-z]+)\\s+(\\d{1,2})[-,\\s]+(\\d{2,4})(?:[ T].*)?$")
+        val matchMdt = monthDayTextRegex.matchEntire(trimmed) ?: monthDayTextRegex.find(trimmed)
         if (matchMdt != null) {
             val monthStr = matchMdt.groupValues[1]
             val day = matchMdt.groupValues[2].toIntOrNull() ?: 1
-            val year = matchMdt.groupValues[3].toIntOrNull() ?: 2026
+            var year = matchMdt.groupValues[3].toIntOrNull() ?: 2026
+            if (year < 100) year += 2000
             val month = monthNameToNumber(monthStr)
             return String.format(Locale.ROOT, "%02d-%02d-%04d", day, month, year)
         }
@@ -257,6 +259,11 @@ object Calculations {
             "yyyy/MM/dd",
             "dd.MM.yyyy",
             "yyyy.MM.dd",
+            "dd-MM-yy",
+            "dd/MM/yy",
+            "yyyy-MM-dd HH:mm:ss",
+            "dd-MM-yyyy HH:mm:ss",
+            "dd/MM/yyyy HH:mm:ss",
             "EEE, dd MMM yyyy HH:mm:ss z",
             "EEE MMM dd HH:mm:ss z yyyy"
         )
