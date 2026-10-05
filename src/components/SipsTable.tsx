@@ -30,6 +30,10 @@ export const SipsTable: React.FC<SipsTableProps> = ({
     0
   );
 
+  const totalMonthlySipCommitment = filtered
+    .filter((s) => !s.isPaused)
+    .reduce((sum, s) => sum + (s.amount || 0), 0);
+
   // Group filtered SIPs by Platform
   const platformGroupMap = new Map<string, SIP[]>();
   filtered.forEach((item) => {

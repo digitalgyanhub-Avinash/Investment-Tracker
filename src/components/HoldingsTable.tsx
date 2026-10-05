@@ -1,7 +1,36 @@
 import React from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { Holding } from '../types';
 import { formatCurrency, parseBreakdownString, toStandardDate } from '../utils/calculations';
+
+// Framer Motion variants for staggered row slide-in
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: (customDelay: number = 0) => ({
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+      delayChildren: 0.02 + (typeof customDelay === 'number' ? customDelay * 0.06 : 0),
+    },
+  }),
+};
+
+const rowVariants = {
+  hidden: {
+    opacity: 0,
+    x: -20,
+  },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: {
+      type: 'spring' as const,
+      stiffness: 260,
+      damping: 24,
+    },
+  },
+};
 
 interface HoldingsTableProps {
   holdings: Holding[];
@@ -51,7 +80,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
           No holdings found matching filters.
         </div>
       ) : (
-        groupedPlatforms.map((group) => (
+        groupedPlatforms.map((group, groupIdx) => (
           <div
             key={group.platform}
             className="glass-panel rounded-2xl overflow-hidden"
@@ -79,9 +108,19 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
                     <th className="py-2.5 px-4 text-center w-[8%]">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/20 dark:divide-white/5 text-sm">
+                <motion.tbody
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  custom={groupIdx}
+                  className="divide-y divide-white/20 dark:divide-white/5 text-sm"
+                >
                   {group.items.map((item) => (
-                    <tr key={item.id} className="hover:bg-white/40 dark:hover:bg-slate-800/40 transition-colors">
+                    <motion.tr
+                      key={item.id}
+                      variants={rowVariants}
+                      className="hover:bg-white/40 dark:hover:bg-slate-800/40 transition-colors"
+                    >
                       <td className="py-3.5 px-4 font-semibold text-slate-800 dark:text-slate-100 text-sm">
                         {item.category}
                       </td>
@@ -139,16 +178,26 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
                           </button>
                         </div>
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
-                </tbody>
+                </motion.tbody>
               </table>
             </div>
 
             {/* Mobile Stack View */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60 p-3 space-y-3">
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              custom={groupIdx}
+              className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60 p-3 space-y-3"
+            >
               {group.items.map((item) => (
-                <div key={item.id} className="pt-3 first:pt-0 space-y-2">
+                <motion.div
+                  key={item.id}
+                  variants={rowVariants}
+                  className="pt-3 first:pt-0 space-y-2"
+                >
                   <div className="flex items-start justify-between">
                     <div>
                       <h4 className="font-bold text-slate-900 dark:text-white text-sm">
@@ -189,9 +238,9 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
                       <Trash2 className="w-3.5 h-3.5" /> Del
                     </button>
                   </div>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         ))
       )}
