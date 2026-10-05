@@ -97,38 +97,6 @@ fun CommitteesScreen(
         Calculations.calculateCommitteesTotal(committees)
     }
 
-    val totalLatestPaid = remember(activeCommittees) {
-        activeCommittees.sumOf { comm ->
-            val sorted = comm.months.sortedBy { it.monthNumber }
-            val latestPaid = sorted.filter { it.isPaid }.lastOrNull() ?: sorted.lastOrNull()
-            if (latestPaid != null) {
-                if (latestPaid.installmentPerPerson > 0) latestPaid.installmentPerPerson
-                else {
-                    val winnerTakes = if (latestPaid.netPotValue > 0) latestPaid.netPotValue
-                        else maxOf(0.0, comm.totalAmount - latestPaid.winningBid)
-                    if (comm.totalMembers > 0) winnerTakes / comm.totalMembers
-                    else if (comm.baseMonthlyInstallment > 0) comm.baseMonthlyInstallment
-                    else comm.totalAmount / max(1, comm.totalMembers)
-                }
-            } else if (comm.baseMonthlyInstallment > 0) comm.baseMonthlyInstallment
-            else comm.totalAmount / max(1, comm.totalMembers)
-        }
-    }
-
-    val latestActiveMonthLabel = remember(activeCommittees) {
-        activeCommittees.mapNotNull { comm ->
-            val sorted = comm.months.sortedBy { it.monthNumber }
-            val latestPaid = sorted.filter { it.isPaid }.lastOrNull() ?: sorted.lastOrNull()
-            if (latestPaid != null) {
-                Calculations.getCommitteeMonthLabel(
-                    comm.startDate,
-                    latestPaid.monthNumber,
-                    latestPaid.monthLabel
-                )
-            } else null
-        }.firstOrNull { it.isNotBlank() } ?: "Current month"
-    }
-
     val totalPotDrawn = remember(committees) {
         committees.filter { it.hasTakenPot }.sumOf { it.potTakenAmount ?: 0.0 }
     }
@@ -214,20 +182,19 @@ fun CommitteesScreen(
                 .fillMaxSize()
                 .padding(horizontal = 14.dp)
         ) {
-            // Top Metrics: 2x2 Clean Balanced Grid
+            // Top Metrics: 3 Cards in a Single Row
             item {
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Row 1 of 2: Total Invested & Committees Pool
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     CommitteeMetricCard(
                         title = "Total Invested",
                         value = Calculations.formatCurrency(totalInvested),
                         valueColor = Color(0xFF4F46E5),
-                        subtitle = "${committees.size} Total Chit Funds",
+                        subtitle = "${committees.size} Chit Funds",
                         subtitleColor = Color(0xFF64748B),
                         iconRes = R.drawable.ic_lucide_wallet,
                         iconTint = Color(0xFF4F46E5),
@@ -244,26 +211,6 @@ fun CommitteesScreen(
                         iconRes = R.drawable.ic_lucide_users,
                         iconTint = Color(0xFF7C3AED),
                         iconBg = Color(0xFFF3E8FF),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Row 2 of 2: Monthly Due & Pot Drawn
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    CommitteeMetricCard(
-                        title = "Monthly Due",
-                        value = Calculations.formatCurrency(totalLatestPaid),
-                        valueColor = Color(0xFFD97706),
-                        subtitle = if (activeCommittees.isNotEmpty()) latestActiveMonthLabel else "All settled",
-                        subtitleColor = Color(0xFFD97706),
-                        iconRes = R.drawable.ic_lucide_clock,
-                        iconTint = Color(0xFFD97706),
-                        iconBg = Color(0xFFFEF3C7),
                         modifier = Modifier.weight(1f)
                     )
 
@@ -435,13 +382,13 @@ private fun CommitteeMetricCard(
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.52f)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.55f)),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.70f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
-            modifier = Modifier.padding(13.dp)
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 11.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -450,18 +397,19 @@ private fun CommitteeMetricCard(
             ) {
                 Text(
                     text = title,
-                    fontSize = if (title.length > 18) 10.5.sp else 11.5.sp,
+                    fontSize = 10.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF64748B),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f, fill = false)
                 )
+                Spacer(modifier = Modifier.width(3.dp))
                 Box(
                     modifier = Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(9.dp))
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(7.dp))
                         .background(iconBg),
                     contentAlignment = Alignment.Center
                 ) {
@@ -469,7 +417,7 @@ private fun CommitteeMetricCard(
                         painter = painterResource(iconRes),
                         contentDescription = null,
                         tint = iconTint,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(13.dp)
                     )
                 }
             }
@@ -478,10 +426,11 @@ private fun CommitteeMetricCard(
 
             Text(
                 text = value,
-                fontSize = 17.5.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = valueColor,
                 maxLines = 1,
+                softWrap = false,
                 overflow = TextOverflow.Ellipsis
             )
 
@@ -489,10 +438,11 @@ private fun CommitteeMetricCard(
 
             Text(
                 text = subtitle,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Medium,
                 color = subtitleColor,
                 maxLines = 1,
+                softWrap = false,
                 overflow = TextOverflow.Ellipsis
             )
         }
