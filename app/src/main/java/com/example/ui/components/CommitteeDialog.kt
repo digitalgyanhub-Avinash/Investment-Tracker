@@ -524,7 +524,18 @@ fun CommitteeDialog(
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                     OutlinedTextField(
                                         value = potTakenMonthStr,
-                                        onValueChange = { potTakenMonthStr = it },
+                                        onValueChange = { newMonth ->
+                                            potTakenMonthStr = newMonth
+                                            val mNum = newMonth.toIntOrNull()
+                                            val matchedM = initialCommittee?.months?.find { it.monthNumber == mNum }
+                                            if (matchedM != null && potTakenAmountStr.isBlank()) {
+                                                val autoNet = if (matchedM.netPotValue > 0) matchedM.netPotValue
+                                                    else maxOf(0.0, (totalAmountStr.toDoubleOrNull() ?: 60000.0) - matchedM.winningBid)
+                                                if (autoNet > 0) {
+                                                    potTakenAmountStr = autoNet.toInt().toString()
+                                                }
+                                            }
+                                        },
                                         label = { Text("Taken Month #") },
                                         placeholder = { Text("1") },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -551,6 +562,75 @@ fun CommitteeDialog(
                                         ),
                                         singleLine = true
                                     )
+                                }
+
+                                val mNum = potTakenMonthStr.toIntOrNull() ?: 1
+                                val matchedM = initialCommittee?.months?.find { it.monthNumber == mNum }
+                                val previewPot = potTakenAmountStr.toDoubleOrNull() ?: matchedM?.let {
+                                    if (it.netPotValue > 0) it.netPotValue
+                                    else maxOf(0.0, (totalAmountStr.toDoubleOrNull() ?: 60000.0) - it.winningBid)
+                                } ?: 0.0
+
+                                if (previewPot > 0.0) {
+                                    val totAmt = totalAmountStr.toDoubleOrNull() ?: 60000.0
+                                    val totMems = totalMembersStr.toIntOrNull() ?: 12
+                                    val totMos = totalMonthsStr.toIntOrNull() ?: 12
+                                    val baseInst = baseMonthlyStr.toDoubleOrNull() ?: (totAmt / if (totMems > 0) totMems else 1)
+                                    val tempComm = (initialCommittee ?: Committee(
+                                        name = name,
+                                        totalAmount = totAmt,
+                                        totalMembers = totMems,
+                                        totalMonths = totMos,
+                                        startDate = startDate,
+                                        baseMonthlyInstallment = baseInst
+                                    )).copy(
+                                        totalAmount = totAmt,
+                                        totalMembers = totMems,
+                                        totalMonths = totMos,
+                                        baseMonthlyInstallment = baseInst,
+                                        hasTakenPot = true,
+                                        potTakenMonth = mNum,
+                                        potTakenAmount = previewPot
+                                    )
+                                    val calcProfit = Calculations.calculateCommitteeProfitLoss(tempComm)
+                                    val isProf = calcProfit >= 0
+                                    val absAmount = Calculations.formatCurrency(Math.abs(calcProfit)).replace("₹", "").trim()
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (isProf) Color(0xFFECFDF5) else Color(0xFFFEF2F2),
+                                        border = BorderStroke(1.dp, if (isProf) Color(0xFFA7F3D0) else Color(0xFFFECACA)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.ic_lucide_award),
+                                                    contentDescription = null,
+                                                    tint = if (isProf) Color(0xFF059669) else Color(0xFFDC2626),
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = if (isProf) "Calculated Net Profit" else "Calculated Net Loss",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = if (isProf) Color(0xFF065F46) else Color(0xFF991B1B)
+                                                )
+                                            }
+                                            Text(
+                                                text = if (isProf) "+₹$absAmount" else "-₹$absAmount",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = if (isProf) Color(0xFF047857) else Color(0xFFDC2626)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -678,7 +758,7 @@ fun CommitteeBidDialog(
     committee: Committee,
     initialMonth: Int,
     onDismiss: () -> Unit,
-    onSaveBid: (monthNumber: Int, monthLabel: String, winningBid: Double, winnerName: String, isPaid: Boolean, installmentPerMember: Double) -> Unit
+    onSaveBid: (monthNumber: Int, monthLabel: String, winningBid: Double, winnerName: String, isPaid: Boolean, installmentPerMember: Double, isSelfWinner: Boolean) -> Unit
 ) {
     val existing = committee.months.find { it.monthNumber == initialMonth }
 
@@ -700,6 +780,12 @@ fun CommitteeBidDialog(
         )
     }
     var winnerName by remember { mutableStateOf(existing?.winnerName ?: "") }
+    var isSelfWinner by remember {
+        mutableStateOf(
+            (existing?.winnerName?.equals("Self", ignoreCase = true) == true) ||
+            (committee.hasTakenPot && committee.potTakenMonth == initialMonth)
+        )
+    }
     var isPaid by remember { mutableStateOf(existing?.isPaid ?: true) }
 
     val bid = bidAmountStr.toDoubleOrNull() ?: 0.0
@@ -906,7 +992,52 @@ fun CommitteeBidDialog(
                         singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (isSelfWinner) Color(0xFFEDE9FE).copy(alpha = 0.5f) else Color(0xFFF8FAFC),
+                        border = BorderStroke(1.dp, if (isSelfWinner) Color(0xFF8B5CF6).copy(alpha = 0.5f) else Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Did you take / win this pot?",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF0F172A)
+                                )
+                                Text(
+                                    text = if (isSelfWinner) "You received net payout of ${Calculations.formatCurrency(netPot)}"
+                                    else "Enable if you won or lifted the pot in Month $initialMonth",
+                                    fontSize = 11.sp,
+                                    color = if (isSelfWinner) Color(0xFF7C3AED) else Color(0xFF64748B)
+                                )
+                            }
+                            Switch(
+                                checked = isSelfWinner,
+                                onCheckedChange = { checked ->
+                                    isSelfWinner = checked
+                                    if (checked && (winnerName.isBlank() || winnerName == "—")) {
+                                        winnerName = "Self"
+                                    }
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFF7C3AED)
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Surface(
                         shape = RoundedCornerShape(14.dp),
@@ -983,7 +1114,7 @@ fun CommitteeBidDialog(
                                 .clickable {
                                     val mNum = monthNumStr.toIntOrNull() ?: initialMonth
                                     val customInstallment = installmentPerMemberStr.toDoubleOrNull() ?: 0.0
-                                    onSaveBid(mNum, autoMonthLabel, bid, winnerName, isPaid, customInstallment)
+                                    onSaveBid(mNum, autoMonthLabel, bid, winnerName, isPaid, customInstallment, isSelfWinner)
                                     onDismiss()
                                 },
                             contentAlignment = Alignment.Center

@@ -772,7 +772,7 @@ fun MainScreen(viewModel: InvestmentViewModel) {
                 committee = bidCommittee!!,
                 initialMonth = bidMonth,
                 onDismiss = { showBidDialog = false },
-                onSaveBid = { monthNumber, monthLabel, winningBid, winnerName, isPaid, installmentPerMember ->
+                onSaveBid = { monthNumber, monthLabel, winningBid, winnerName, isPaid, installmentPerMember, isSelfWinner ->
                     viewModel.addOrUpdateCommitteeBid(
                         committee = bidCommittee!!,
                         monthNumber = monthNumber,
@@ -780,7 +780,8 @@ fun MainScreen(viewModel: InvestmentViewModel) {
                         winningBid = winningBid,
                         winnerName = winnerName,
                         isPaid = isPaid,
-                        customInstallment = installmentPerMember
+                        customInstallment = installmentPerMember,
+                        isSelfWinner = isSelfWinner
                     )
                     showBidDialog = false
                 }

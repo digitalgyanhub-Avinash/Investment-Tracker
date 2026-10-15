@@ -673,17 +673,27 @@ private fun CommitteeItemCard(
                             modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
+                        val potAmount = if ((committee.potTakenAmount ?: 0.0) > 0.0) {
+                            committee.potTakenAmount!!
+                        } else if (committee.potTakenMonth != null) {
+                            val m = committee.months.find { it.monthNumber == committee.potTakenMonth }
+                            if (m != null && m.netPotValue > 0.0) m.netPotValue
+                            else if (m != null && m.winningBid > 0.0) maxOf(0.0, committee.totalAmount - m.winningBid)
+                            else 0.0
+                        } else 0.0
+
                         Text(
-                            text = "Pot Drawn: ${Calculations.formatCurrency(committee.potTakenAmount ?: 0.0)}${if (committee.potTakenMonth != null) " (Month ${committee.potTakenMonth})" else ""}",
+                            text = "Pot Drawn: ${Calculations.formatCurrency(potAmount)}${if (committee.potTakenMonth != null) " (Month ${committee.potTakenMonth})" else ""}",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF065F46)
                         )
                         Spacer(modifier = Modifier.weight(1f))
-                        val potTotal = committee.totalAmount
-                        val potAmount = committee.potTakenAmount ?: 0.0
-                        if (isCompleted && potAmount > 0) {
-                            val profitLoss = potAmount - invested
+                        if (potAmount > 0.0) {
+                            val effectiveCommittee = if (committee.potTakenAmount == null || committee.potTakenAmount == 0.0) {
+                                committee.copy(potTakenAmount = potAmount)
+                            } else committee
+                            val profitLoss = Calculations.calculateCommitteeProfitLoss(effectiveCommittee)
                             val isProfit = profitLoss >= 0
                             val absAmount = Calculations.formatCurrency(Math.abs(profitLoss)).replace("₹", "").trim()
                             val text = if (isProfit) "Profit: ₹+$absAmount" else "Loss: ₹-$absAmount"
@@ -694,8 +704,8 @@ private fun CommitteeItemCard(
                                 fontWeight = FontWeight.Bold,
                                 color = textColor
                             )
-                        } else if (potTotal > 0 && potAmount > 0) {
-                            val discount = maxOf(0.0, potTotal - potAmount)
+                        } else if (committee.totalAmount > 0) {
+                            val discount = maxOf(0.0, committee.totalAmount - potAmount)
                             Text(
                                 text = "Bid: ${Calculations.formatCurrency(discount)}",
                                 fontSize = 11.sp,

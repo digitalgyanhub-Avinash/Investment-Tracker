@@ -600,4 +600,38 @@ object Calculations {
         return committees.filter { !isCommitteeCompleted(it) }
             .sumOf { calculateCommitteeCurrentOutflow(it) }
     }
+
+    fun calculateCommitteeProfitLoss(committee: Committee): Double {
+        if (!committee.hasTakenPot) return 0.0
+        val potAmount = if ((committee.potTakenAmount ?: 0.0) > 0.0) {
+            committee.potTakenAmount!!
+        } else if (committee.potTakenMonth != null) {
+            val m = committee.months.find { it.monthNumber == committee.potTakenMonth }
+            if (m != null && m.netPotValue > 0.0) m.netPotValue
+            else if (m != null && m.winningBid > 0.0) maxOf(0.0, committee.totalAmount - m.winningBid)
+            else 0.0
+        } else 0.0
+
+        if (potAmount <= 0.0) return 0.0
+
+        val actualInvested = calculateCommitteeInvestedTillDate(committee)
+        if (isCommitteeCompleted(committee)) {
+            return potAmount - actualInvested
+        }
+
+        val totalMonths = if (committee.totalMonths > 0) committee.totalMonths else 12
+        val base = if (committee.baseMonthlyInstallment > 0) committee.baseMonthlyInstallment
+        else committee.totalAmount / max(1, committee.totalMembers)
+
+        val paidMonthsCount = if (committee.months.isNotEmpty()) committee.months.count { it.isPaid } else committee.currentMonth
+        val remainingMonths = maxOf(0, totalMonths - paidMonthsCount)
+
+        val unpaidLoggedMonths = committee.months.filter { !it.isPaid }
+        val unpaidLoggedSum = unpaidLoggedMonths.sumOf { if (it.installmentPerPerson > 0) it.installmentPerPerson else base }
+        val unloggedRemainingCount = maxOf(0, remainingMonths - unpaidLoggedMonths.size)
+        val estimatedRemaining = unpaidLoggedSum + (unloggedRemainingCount * base)
+
+        val totalExpectedInvestment = actualInvested + estimatedRemaining
+        return potAmount - totalExpectedInvestment
+    }
 }

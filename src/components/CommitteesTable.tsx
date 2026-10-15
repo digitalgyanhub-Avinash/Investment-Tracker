@@ -27,6 +27,7 @@ import {
   calculateCommitteeBidDetails,
   getCommitteeLatestMonthLabel,
   isCommitteeCompleted,
+  calculateCommitteeProfitLoss,
   toStandardDate,
   parseDateToMs,
 } from '../utils/calculations';
@@ -266,10 +267,27 @@ export const CommitteesTable: React.FC<CommitteesTableProps> = ({
                       )}
 
                       {committee.hasTakenPot && (
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
-                          <Award className="w-3.5 h-3.5" />
-                          Pot Taken ({formatCurrency(committee.potTakenAmount || 0)} / {formatCurrency(committee.totalAmount)})
-                        </span>
+                        <>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                            <Award className="w-3.5 h-3.5" />
+                            Pot Taken ({formatCurrency(committee.potTakenAmount || 0)} / {formatCurrency(committee.totalAmount)})
+                          </span>
+                          {(() => {
+                            const profitLoss = calculateCommitteeProfitLoss(committee);
+                            const isProfit = profitLoss >= 0;
+                            return (
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 ${
+                                  isProfit
+                                    ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300'
+                                    : 'bg-red-100 dark:bg-red-900/60 text-red-700 dark:text-red-300'
+                                }`}
+                              >
+                                {isProfit ? `Profit: +${formatCurrency(profitLoss)}` : `Loss: -${formatCurrency(Math.abs(profitLoss))}`}
+                              </span>
+                            );
+                          })()}
+                        </>
                       )}
                     </div>
 

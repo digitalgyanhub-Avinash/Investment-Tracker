@@ -353,6 +353,42 @@ export function calculateCommitteesMonthlyOutflow(committees: Committee[]): numb
 }
 
 /**
+ * Calculate Net Profit / Loss for a Committee when the pot is taken
+ */
+export function calculateCommitteeProfitLoss(committee: Committee): number {
+  if (!committee || !committee.hasTakenPot) return 0;
+  let potAmount = committee.potTakenAmount || 0;
+  if (potAmount <= 0 && committee.potTakenMonth !== undefined && committee.months) {
+    const m = committee.months.find((item) => item.monthNumber === committee.potTakenMonth);
+    if (m && m.netPotValue && m.netPotValue > 0) {
+      potAmount = m.netPotValue;
+    } else if (m && m.winningBid && m.winningBid > 0) {
+      potAmount = Math.max(0, committee.totalAmount - m.winningBid);
+    }
+  }
+
+  if (potAmount <= 0) return 0;
+
+  const actualInvested = calculateCommitteeInvestedTillDate(committee);
+  if (isCommitteeCompleted(committee)) {
+    return potAmount - actualInvested;
+  }
+
+  const totalMonths = committee.totalMonths || 12;
+  const base = committee.baseMonthlyInstallment || (committee.totalAmount / (committee.totalMembers || 12));
+  const paidMonthsCount = committee.months ? committee.months.filter((m) => m.isPaid).length : (committee.currentMonth || 1);
+  const remainingMonths = Math.max(0, totalMonths - paidMonthsCount);
+
+  const unpaidLoggedMonths = committee.months ? committee.months.filter((m) => !m.isPaid) : [];
+  const unpaidLoggedSum = unpaidLoggedMonths.reduce((sum, m) => sum + (m.installmentPerPerson || base), 0);
+  const unloggedRemainingCount = Math.max(0, remainingMonths - unpaidLoggedMonths.length);
+  const totalRemainingExpected = unpaidLoggedSum + (unloggedRemainingCount * base);
+
+  const totalExpectedInvestment = actualInvested + totalRemainingExpected;
+  return potAmount - totalExpectedInvestment;
+}
+
+/**
  * Format numbers as Indian standard currency string (e.g. ₹67,000)
  */
 export function formatCurrency(amount: number): string {

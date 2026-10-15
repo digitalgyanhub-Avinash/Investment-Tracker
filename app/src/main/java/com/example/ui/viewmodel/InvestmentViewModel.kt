@@ -368,7 +368,8 @@ class InvestmentViewModel(application: Application) : AndroidViewModel(applicati
         winningBid: Double,
         winnerName: String,
         isPaid: Boolean,
-        customInstallment: Double = 0.0
+        customInstallment: Double = 0.0,
+        isSelfWinner: Boolean = false
     ) {
         viewModelScope.launch {
             val netPotValue = maxOf(0.0, committee.totalAmount - winningBid)
@@ -397,9 +398,13 @@ class InvestmentViewModel(application: Application) : AndroidViewModel(applicati
             }
 
             val updatedCurrentMonth = maxOf(committee.currentMonth, monthNumber)
+            val takesPot = isSelfWinner || winnerName.equals("Self", ignoreCase = true)
             val updated = committee.copy(
                 months = newMonths,
                 currentMonth = updatedCurrentMonth,
+                hasTakenPot = if (takesPot) true else committee.hasTakenPot,
+                potTakenMonth = if (takesPot) monthNumber else committee.potTakenMonth,
+                potTakenAmount = if (takesPot) netPotValue else committee.potTakenAmount,
                 updatedAt = System.currentTimeMillis()
             )
             repository.updateCommittee(updated)
